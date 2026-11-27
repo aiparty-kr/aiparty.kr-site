@@ -407,33 +407,64 @@ const organizerTotal = organizers.length;
 							<p id="agreed-date" class="text-[15px] text-stone-600 dark:text-stone-400 tracking-[-0.14px]"></p>
 						</div>
 
-						<!-- 개인정보 동의 -->
-						<div class="flex items-start gap-3 pt-2">
-							<input
-								type="checkbox" id="privacy_agreed" name="privacy_agreed" required
-								class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0"
-							/>
-							<label for="privacy_agreed" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
-								<span class="text-red-500" aria-hidden="true">*</span>
-								본인은 에이아이당(가칭) 창당준비위원회 발기인에 동의하며, 개인정보 수집 및 이용에 동의합니다.
-								성명, 주소, 생년월일, 성별, 직업, 전화번호, 서명 정보를 창당 발기인 등록 목적으로 수집하며,
-								창당 절차 완료 후 관련 법령에 따라 보관 또는 파기합니다.
-								이메일·아이디·닉네임은 계정 운영, 로그인 및 초대 현황 제공에 사용합니다.
-								<a href="/community/privacy" class="c-link">개인정보 수집·이용 안내</a>
-							</label>
-						</div>
-
-						<!-- 발기인 공개 동의 (선택) -->
-						<div class="flex items-start gap-3">
-							<input
-								type="checkbox" id="public_consent" name="public_consent"
-								class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0"
-							/>
-							<label for="public_consent" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
-								<span class="text-[11px] text-stone-400 dark:text-stone-500">(선택)</span>
-								본인이 에이아이당(가칭) 발기인으로 참여했다는 사실을 외부에 공개하는 것에 동의합니다.
-							</label>
-						</div>
+						<!-- 동의 항목: 발기인 동의, 자격 확인, 개인정보, 민감정보는 각각 따로 받는다 -->
+						<fieldset id="consent-group" class="space-y-4 pt-2">
+							<legend class="block text-[14px] font-medium text-stone-700 dark:text-stone-300 tracking-[-0.14px] mb-3">동의 항목</legend>
+							<div class="flex items-start gap-3">
+								<input type="checkbox" id="founder_agreed" name="founder_agreed" required aria-describedby="consent-error" class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0" />
+								<label for="founder_agreed" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
+									<span class="text-red-500" aria-hidden="true">*</span> <span class="text-[11px] text-stone-500 dark:text-stone-400">(필수)</span>
+									본인은 에이아이당(가칭) 중앙당 창당준비위원회의 발기인이 되는 것에 동의합니다.
+								</label>
+							</div>
+							<div class="flex items-start gap-3">
+								<input type="checkbox" id="eligibility_confirmed" name="eligibility_confirmed" required aria-describedby="consent-error" class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0" />
+								<label for="eligibility_confirmed" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
+									<span class="text-red-500" aria-hidden="true">*</span> <span class="text-[11px] text-stone-500 dark:text-stone-400">(필수)</span>
+									본인은 만 18세 이상 대한민국 국민이며, 정당법 제22조에 따라 정당 가입이 금지된 사람(공무원, 사립학교 교원(대학 교원 제외), 법령상 공무원 신분을 가진 사람, 선거권이 없는 사람)이 아님을 확인합니다.
+								</label>
+							</div>
+							<div class="rounded-xl border border-stone-200 dark:border-white/10 p-4 text-[12px] leading-5 text-stone-600 dark:text-stone-400 tracking-[-0.14px]">
+								<p class="font-medium text-stone-700 dark:text-stone-300 mb-1">개인정보 수집·이용 안내</p>
+								<ul class="list-disc pl-4 space-y-0.5">
+									<li>수집하는 곳: 에이아이당(가칭) 창당 준비팀</li>
+									<li>목적: 중앙당 창당준비위원회 결성신고에 필요한 발기인 명단·동의서 작성, 발기인 자격 확인, 발기인 연락</li>
+									<li>항목: 성명, 주소, 생년월일, 성별, 직업, 휴대폰 번호, 서명, 동의 날짜 (자택 전화번호는 선택)</li>
+									<li>보유기간: 중앙당 등록 절차가 끝나거나 창당준비위원회가 소멸하면 지체 없이 파기합니다. 선거관리위원회에 제출한 서류는 제출처의 기준에 따릅니다.</li>
+									<li>동의를 거부할 수 있습니다. 다만 거부하면 발기인으로 등록할 수 없습니다.</li>
+								</ul>
+								<a href="/community/privacy" class="c-link">개인정보 처리 안내 전문 보기</a>
+							</div>
+							<div class="flex items-start gap-3">
+								<input type="checkbox" id="privacy_agreed" name="privacy_agreed" required aria-describedby="consent-error" class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0" />
+								<label for="privacy_agreed" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
+									<span class="text-red-500" aria-hidden="true">*</span> <span class="text-[11px] text-stone-500 dark:text-stone-400">(필수)</span>
+									위 개인정보 수집·이용에 동의합니다. 이메일·아이디·닉네임은 계정 운영, 로그인, 초대 현황 제공에 사용합니다.
+								</label>
+							</div>
+							<div class="flex items-start gap-3">
+								<input type="checkbox" id="sensitive_agreed" name="sensitive_agreed" required aria-describedby="consent-error" class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0" />
+								<label for="sensitive_agreed" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
+									<span class="text-red-500" aria-hidden="true">*</span> <span class="text-[11px] text-stone-500 dark:text-stone-400">(필수)</span>
+									발기인으로 참여한다는 사실은 정치적 견해에 관한 정보로, 개인정보 보호법 제23조의 민감정보에 해당합니다. 이 정보를 위 목적에 한해 처리하는 것에 동의합니다. 동의를 거부할 수 있으나, 거부하면 발기인으로 등록할 수 없습니다.
+								</label>
+							</div>
+							<div class="flex items-start gap-3">
+								<input type="checkbox" id="public_consent" name="public_consent" aria-describedby="consent-error" class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0" />
+								<label for="public_consent" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
+									<span class="text-[11px] text-stone-400 dark:text-stone-500">(선택)</span>
+									본인이 에이아이당(가칭) 발기인으로 참여했다는 사실을 외부에 공개하는 것에 동의합니다. 동의하지 않아도 발기인 등록에는 영향이 없습니다.
+								</label>
+							</div>
+							<div class="flex items-start gap-3">
+								<input type="checkbox" id="contact_consent" name="contact_consent" aria-describedby="consent-error" class="mt-0.5 size-4 rounded border-stone-300 dark:border-white/20 accent-[#222222] dark:accent-stone-300 shrink-0" />
+								<label for="contact_consent" class="text-[13px] text-stone-600 dark:text-stone-400 leading-5 tracking-[-0.14px]">
+									<span class="text-[11px] text-stone-400 dark:text-stone-500">(선택)</span>
+									창당준비위원회가 결성된 뒤 입당 안내를 휴대폰 번호로 받는 것에 동의합니다. 발기인 동의는 입당이 아니며, 당원이 되려면 결성 후 입당원서를 따로 제출해야 합니다.
+								</label>
+							</div>
+							<p class="field-error hidden mt-1 text-[12px] text-red-500" id="consent-error" role="alert"></p>
+						</fieldset>
 					</div>
 
 					<!-- 접수하기 버튼 -->
@@ -844,16 +875,23 @@ const organizerTotal = organizers.length;
 					errors.push({ field: 'signature', message: '서명을 해 주세요.', isSignature: true });
 				}
 
-				const privacyAgreed = form.querySelector('#privacy_agreed').checked;
-				if (!privacyAgreed) {
-					errors.push({ field: 'privacy_agreed', message: '동의에 체크해 주세요.' });
+				const missingConsent = ['founder_agreed', 'eligibility_confirmed', 'privacy_agreed', 'sensitive_agreed']
+					.find((id) => !form.querySelector(`#${id}`).checked);
+				if (missingConsent) {
+					errors.push({ field: missingConsent, message: '필수 동의 항목에 모두 체크해 주세요.', isConsent: true });
 				}
 
 				return errors;
 			}
 
 			function showFieldErrors(errors) {
-				errors.forEach(({ field, message, isGroup, isSignature, isAddress }) => {
+				errors.forEach(({ field, message, isGroup, isSignature, isAddress, isConsent }) => {
+					if (isConsent) {
+						const el = document.getElementById('consent-error');
+						el.textContent = message;
+						el.classList.remove('hidden');
+						return;
+					}
 					if (isSignature) {
 						const el = document.getElementById('signature-error');
 						el.textContent = message;
@@ -888,7 +926,11 @@ const organizerTotal = organizers.length;
 				});
 
 				const firstField = errors[0];
-				if (firstField.isSignature) {
+				if (firstField.isConsent) {
+					const el = document.getElementById(firstField.field);
+					el.scrollIntoView({ behavior: scrollBehavior, block: 'center' });
+					el.focus();
+				} else if (firstField.isSignature) {
 					document.getElementById('signature-canvas').scrollIntoView({ behavior: scrollBehavior, block: 'center' });
 				} else if (firstField.isGroup) {
 					document.getElementById('gender-group').scrollIntoView({ behavior: scrollBehavior, block: 'center' });
@@ -970,8 +1012,12 @@ const organizerTotal = organizers.length;
 						phone_mobile: fd.get('phone_mobile').trim(),
 						signature_data: signatureData,
 						agreed_at: agreedAt,
+						founder_agreed: true,
+						eligibility_confirmed: true,
 						privacy_agreed: true,
+						sensitive_agreed: true,
 						public_consent: form.querySelector('#public_consent').checked,
+						contact_consent: form.querySelector('#contact_consent').checked,
 					};
 					const result = await submitFoundingSignup({ referrerUsername: fd.get('referrer') || '', founder });
 					clearSignature();
