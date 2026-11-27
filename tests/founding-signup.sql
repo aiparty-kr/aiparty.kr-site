@@ -5,6 +5,8 @@
 \ir community.sql
 \ir ../db/2026-10-09_founding_signup.sql
 \ir ../db/2026-10-09_founding_signup.sql
+\ir ../db/2026-11-27_founding_consent_split.sql
+\ir ../db/2026-11-27_founding_consent_split.sql
 begin;
 create function pg_temp.assert(ok boolean,label text) returns void language plpgsql as $$ begin
  if ok is distinct from true then raise exception 'ASSERTION FAILED: %',label; end if;
@@ -21,7 +23,7 @@ end $$;
 create function pg_temp.founder() returns jsonb language sql as $$
  select jsonb_build_object('name','홍길동','address','서울특별시 중구 테스트로 1','birth_date','1990-01-01','gender','남',
  'occupation','직장인','phone_home',null,'phone_mobile','010-1234-5678','agreed_at',(now() at time zone 'Asia/Seoul')::date,
- 'privacy_agreed',true,'public_consent',false,
+ 'privacy_agreed',true,'public_consent',false,'founder_agreed',true,'eligibility_confirmed',true,'sensitive_agreed',true,
  'signature_data','data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+r/2kAAAAASUVORK5CYII=')
 $$;
 
@@ -39,6 +41,10 @@ select set_config('request.jwt.claim.sub','',true);
 select pg_temp.expect_error('select * from private.community_founding_signup_drafts','42501','draft PII private');
 select pg_temp.expect_error('insert into public.founding_members(name,address,birth_date,gender,occupation,phone_mobile,signature_data,agreed_at,privacy_agreed) values(''Bypass'',''address'',''1990-01-01'',''남'',''test'',''01012345678'',''sig'',current_date,true)','42501','direct anonymous consent bypass denied');
 select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''badprivacy'',''Bad'',pg_temp.founder() || ''{"privacy_agreed":false}''::jsonb)','22023','consent required');
+select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''nofounder'',''Bad'',pg_temp.founder() - ''founder_agreed'')','22023','founder consent required separately');
+select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''noelig'',''Bad'',pg_temp.founder() || ''{"eligibility_confirmed":false}''::jsonb)','22023','eligibility confirmation required');
+select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''nosens'',''Bad'',pg_temp.founder() - ''sensitive_agreed'')','22023','sensitive-data consent required separately');
+select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''badcontact'',''Bad'',pg_temp.founder() || ''{"contact_consent":"yes"}''::jsonb)','22023','contact consent must be boolean');
 select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''young'',''Young'',pg_temp.founder() || jsonb_build_object(''birth_date'',current_date))','22023','age18 enforced');
 select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''baddate'',''Bad'',pg_temp.founder() || ''{"birth_date":"2000-02-31"}''::jsonb)','22023','real birth date enforced');
 select pg_temp.expect_error('select public.community_prepare_founding_signup(''a@example.invalid'',''badsign'',''Bad'',pg_temp.founder() || ''{"signature_data":"data:image/png;base64,aGVsbG8="}''::jsonb)','22023','PNG signature checked');
@@ -68,6 +74,7 @@ select pg_temp.assert((select count(*) = 1 from public.founding_members),'email 
 insert into auth.users values('00000000-0000-0000-0000-000000000001','alice@example.invalid',now(),jsonb_build_object('community_signup',true,'founding_signup_token',:'alice_token','privacy_version','2026-10-09'));
 select pg_temp.assert((select username = 'alice' from public.community_profiles where user_id = '00000000-0000-0000-0000-000000000001'),'draft creates profile');
 select pg_temp.assert((select name = '홍길동' and privacy_agreed = true from public.founding_members where submitted_by = '00000000-0000-0000-0000-000000000001'),'Auth trigger uses new account owner rather than null request UID');
+select pg_temp.assert((select founder_agreed and eligibility_confirmed and sensitive_agreed and contact_consent = false and consent_version = '2026-11-27' from public.founding_members where submitted_by = '00000000-0000-0000-0000-000000000001'),'split consents recorded with version');
 select pg_temp.assert((select not raw_user_meta_data ?| array['name','address','birth_date','phone_mobile','signature_data','password','founder'] from auth.users where id = '00000000-0000-0000-0000-000000000001'),'no founder PII/signature/password in Auth metadata');
 select pg_temp.assert((select completed_at is not null and email is null and username is null and display_name is null and founder is null and visitor_id is null and referrer_username is null from private.community_founding_signup_drafts where token = :'alice_token'::uuid),'consumed draft immediately scrubbed');
 select pg_temp.expect_error(format('insert into auth.users values(%L,%L,now(),%L::jsonb)','00000000-0000-0000-0000-000000000092','alice@example.invalid',jsonb_build_object('community_signup',true,'founding_signup_token',:'alice_token','privacy_version','2026-10-09')::text),'22023','token single use');
