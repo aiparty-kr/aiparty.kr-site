@@ -1,0 +1,25 @@
+name: Keep Supabase awake
+
+# Free Supabase projects pause after 7 days without activity.
+# This calls the public founder-stats RPC (anon key, read-only aggregate) every day.
+on:
+  schedule:
+    - cron: '17 0 * * *' # 09:17 KST daily
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Call founder stats RPC
+        run: |
+          URL=$(grep -o 'https://[a-z0-9]*\.supabase\.co' src/lib/supabase.ts)
+          KEY=$(grep -o 'eyJ[^"]*' src/lib/supabase.ts)
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/rest/v1/rpc/founding_member_stats" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{}')
+          echo "HTTP $code"
+          test "$code" = 200
