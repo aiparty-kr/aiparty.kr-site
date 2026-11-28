@@ -229,6 +229,12 @@ import Layout from "../layouts/Layout.astro";
 			const paperCommit = document.getElementById('paper-commit');
 			let paperRows = null;
 
+			// 시트에서 복사하면 날짜가 '1994. 4. 21' 처럼 바뀔 수 있어 YYYY-MM-DD 로 되돌린다.
+			function normDate(v) {
+				const m = /^(\d{4})\s*[.\/-]\s*(\d{1,2})\s*[.\/-]\s*(\d{1,2})\.?$/.exec((v || '').trim());
+				return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : (v || '').trim();
+			}
+
 			function parsePaper(text) {
 				const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
 				const rows = [];
@@ -237,8 +243,8 @@ import Layout from "../layouts/Layout.astro";
 					const c = (line.includes('\t') ? line.split('\t') : line.split(',')).map((v) => v.trim());
 					if (c[0] === '이름') return;
 					const r = {
-						name: c[0] || '', birth_date: c[1] || '', gender: c[2] || '', occupation: c[3] || '',
-						address: c[4] || '', phone_mobile: c[5] || '', phone_home: c[6] || '', agreed_at: c[7] || '',
+						name: c[0] || '', birth_date: normDate(c[1]), gender: c[2] || '', occupation: c[3] || '',
+						address: c[4] || '', phone_mobile: c[5] || '', phone_home: c[6] || '', agreed_at: normDate(c[7]),
 						signature: /^(있음|o|y|yes|true|1|✓|✔)$/i.test(c[8] || ''), paper_ref: c[9] || '',
 					};
 					if ((c[10] || '') !== '') blocked.push({ name: r.name, reason: '확인필요: ' + c[10] });
