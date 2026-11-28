@@ -191,7 +191,11 @@ import Layout from "../layouts/Layout.astro";
 
 					if (m.source === 'paper') {
 						const link = el('a', 'shrink-0 text-[13px] text-stone-600 dark:text-stone-300 underline underline-offset-4', '원본 사진 ↗');
-						if (/^[A-Za-z0-9_-]{10,200}$/.test(m.paper_ref || '')) link.href = 'https://drive.google.com/file/d/' + m.paper_ref + '/view';
+						const ref = /^([A-Za-z0-9_-]{10,200})(?:#p([0-9]{1,4}))?$/.exec(m.paper_ref || '');
+						if (ref) {
+							link.href = 'https://drive.google.com/file/d/' + ref[1] + '/view';
+							if (ref[2]) link.textContent = `원본 ${ref[2]}쪽 ↗`;
+						}
 						link.target = '_blank';
 						link.rel = 'noopener noreferrer';
 						row.append(info, link);

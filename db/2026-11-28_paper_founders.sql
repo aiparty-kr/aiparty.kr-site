@@ -19,16 +19,19 @@ do $$ begin
   end if;
   if not exists (select 1 from pg_constraint where conname = 'founding_members_paper_ref_check') then
     alter table public.founding_members add constraint founding_members_paper_ref_check
-      check (source <> 'paper' or (paper_ref is not null and paper_ref ~ '^[A-Za-z0-9_-]{10,200}$'));
+      check (source <> 'paper' or (paper_ref is not null and paper_ref ~ '^[A-Za-z0-9_-]{10,200}(#p[0-9]{1,4})?$'));
   end if;
 end $$;
 
--- 종이 행에는 서명 이미지가 없다. 온라인 행은 계속 서명이 있어야 한다.
+-- 종이 행에는 서명 이미지가 없고, 종이 양식은 성별·휴대폰을 비워 두는 경우가 많다.
+-- 온라인 행은 계속 셋 다 있어야 한다.
 alter table public.founding_members alter column signature_data drop not null;
+alter table public.founding_members alter column gender drop not null;
+alter table public.founding_members alter column phone_mobile drop not null;
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'founding_members_signature_by_source') then
     alter table public.founding_members add constraint founding_members_signature_by_source
-      check (source = 'paper' or signature_data is not null) not valid;
+      check (source = 'paper' or (signature_data is not null and gender is not null and phone_mobile is not null)) not valid;
   end if;
 end $$;
 
@@ -50,6 +53,8 @@ revoke all on function private.community_legacy_owner() from public, anon, authe
 
 -- p_rows: [{name, birth_date, gender, occupation, address, phone_mobile, phone_home,
 --           agreed_at, signature(true), paper_ref}, ...]
+-- 성별·휴대폰·자택전화는 비어 있어도 된다(적혀 있으면 형식을 검사한다).
+-- paper_ref 는 드라이브 파일 ID, 여러 쪽짜리 스캔이면 '파일ID#p3' 처럼 쪽 번호를 붙인다.
 -- p_commit=false 이면 검사만 한다. true 이면 status 'ok' 인 행만 넣는다.
 create or replace function public.admin_import_paper_founders(p_rows jsonb, p_commit boolean default false)
 returns jsonb language plpgsql security definer set search_path = ''
@@ -77,11 +82,11 @@ begin
     v_name := btrim(coalesce(v_row ->> 'name',''));
     v_addr := btrim(coalesce(v_row ->> 'address',''));
     v_occ := btrim(coalesce(v_row ->> 'occupation',''));
-    v_gender := btrim(coalesce(v_row ->> 'gender',''));
-    v_mobile := btrim(coalesce(v_row ->> 'phone_mobile',''));
+    v_gender := nullif(btrim(coalesce(v_row ->> 'gender','')),'');
+    v_mobile := nullif(btrim(coalesce(v_row ->> 'phone_mobile','')),'');
     v_home := nullif(btrim(coalesce(v_row ->> 'phone_home','')),'');
     v_ref := btrim(coalesce(v_row ->> 'paper_ref',''));
-    v_digits := regexp_replace(v_mobile,'[^0-9]','','g');
+    v_digits := regexp_replace(coalesce(v_mobile,''),'[^0-9]','','g');
 
     begin v_birth := (v_row ->> 'birth_date')::date; exception when others then v_birth := null; end;
     begin v_agreed := (v_row ->> 'agreed_at')::date; exception when others then v_agreed := null; end;
@@ -89,15 +94,15 @@ begin
     if jsonb_typeof(v_row) <> 'object' then v_err := '형식 오류';
     elsif char_length(v_name) not between 2 and 80 then v_err := '이름';
     elsif v_birth is null then v_err := '생년월일';
-    elsif v_gender not in ('남','여') then v_err := '성별(남/여)';
+    elsif v_gender is not null and v_gender not in ('남','여') then v_err := '성별(남/여)';
     elsif char_length(v_occ) not between 1 and 120 then v_err := '직업';
     elsif char_length(v_addr) not between 5 and 500 then v_err := '주소';
-    elsif v_digits !~ '^01[016789][0-9]{7,8}$' or char_length(v_mobile) > 32 then v_err := '휴대폰';
+    elsif v_mobile is not null and (v_digits !~ '^01[016789][0-9]{7,8}$' or char_length(v_mobile) > 32) then v_err := '휴대폰';
     elsif v_home is not null and (char_length(v_home) > 32 or v_home !~ '^[0-9+()[:space:]-]{6,32}$') then v_err := '자택전화';
     elsif v_agreed is null or v_agreed > v_today then v_err := '작성일';
     elsif v_birth > (v_agreed - interval '18 years')::date then v_err := '작성일 기준 만 18세 미만';
     elsif v_row -> 'signature' is distinct from 'true'::jsonb then v_err := '서명 없음';
-    elsif v_ref !~ '^[A-Za-z0-9_-]{10,200}$' then v_err := '사진ID';
+    elsif v_ref !~ '^[A-Za-z0-9_-]{10,200}(#p[0-9]{1,4})?$' then v_err := '사진ID';
     end if;
 
     if v_err is not null then
@@ -108,7 +113,7 @@ begin
     select m.id, m.name, m.source, m.created_at into v_match
       from public.founding_members m
       where (m.name = v_name and m.birth_date = v_birth)
-         or regexp_replace(coalesce(m.phone_mobile,''),'[^0-9]','','g') = v_digits
+         or (v_digits <> '' and regexp_replace(coalesce(m.phone_mobile,''),'[^0-9]','','g') = v_digits)
       order by m.created_at limit 1;
     if found then
       v_out := v_out || jsonb_build_object('row',v_i,'name',v_name,'status','duplicate',
@@ -117,12 +122,13 @@ begin
       continue;
     end if;
 
-    v_key1 := v_name || '|' || v_birth::text; v_key2 := 'p|' || v_digits;
-    if v_key1 = any(v_seen) or v_key2 = any(v_seen) then
+    v_key1 := v_name || '|' || v_birth::text; v_key2 := case when v_digits <> '' then 'p|' || v_digits end;
+    if v_key1 = any(v_seen) or (v_key2 is not null and v_key2 = any(v_seen)) then
       v_out := v_out || jsonb_build_object('row',v_i,'name',v_name,'status','duplicate','reason','붙여넣은 목록 안에서 중복');
       continue;
     end if;
-    v_seen := v_seen || v_key1 || v_key2;
+    v_seen := v_seen || v_key1;
+    if v_key2 is not null then v_seen := v_seen || v_key2; end if;
 
     if p_commit then
       insert into public.founding_members(name,address,birth_date,gender,occupation,phone_home,phone_mobile,
