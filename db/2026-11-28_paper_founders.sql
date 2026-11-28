@@ -10,7 +10,8 @@ begin;
 alter table public.founding_members
   add column if not exists source text not null default 'online',
   add column if not exists paper_ref text,
-  add column if not exists registered_by uuid references auth.users(id) on delete set null;
+  add column if not exists registered_by uuid references auth.users(id) on delete set null,
+  add column if not exists paper_note text;
 
 do $$ begin
   if not exists (select 1 from pg_constraint where conname = 'founding_members_source_check') then
@@ -54,6 +55,7 @@ revoke all on function private.community_legacy_owner() from public, anon, authe
 -- p_rows: [{name, birth_date, gender, occupation, address, phone_mobile, phone_home,
 --           agreed_at, signature(true), paper_ref}, ...]
 -- 성별·휴대폰·자택전화는 비어 있어도 된다(적혀 있으면 형식을 검사한다).
+-- 직업이 비면 '미기재'로 넣는다. note 는 글씨가 불분명한 칸 같은 확인할 거리로, paper_note 에 남는다.
 -- paper_ref 는 드라이브 파일 ID, 여러 쪽짜리 스캔이면 '파일ID#p3' 처럼 쪽 번호를 붙인다.
 -- p_commit=false 이면 검사만 한다. true 이면 status 'ok' 인 행만 넣는다.
 create or replace function public.admin_import_paper_founders(p_rows jsonb, p_commit boolean default false)
@@ -63,7 +65,7 @@ declare
   v_today date := (now() at time zone 'Asia/Seoul')::date;
   v_out jsonb := '[]'::jsonb;
   v_row jsonb; v_i int := 0;
-  v_name text; v_addr text; v_occ text; v_gender text; v_mobile text; v_home text; v_ref text;
+  v_name text; v_addr text; v_occ text; v_note text; v_gender text; v_mobile text; v_home text; v_ref text;
   v_birth date; v_agreed date; v_digits text;
   v_err text; v_match record; v_id uuid;
   v_seen text[] := '{}';
@@ -86,6 +88,8 @@ begin
     v_mobile := nullif(btrim(coalesce(v_row ->> 'phone_mobile','')),'');
     v_home := nullif(btrim(coalesce(v_row ->> 'phone_home','')),'');
     v_ref := btrim(coalesce(v_row ->> 'paper_ref',''));
+    v_note := nullif(left(btrim(coalesce(v_row ->> 'note','')),500),'');
+    if v_occ = '' then v_occ := '미기재'; end if;
     v_digits := regexp_replace(coalesce(v_mobile,''),'[^0-9]','','g');
 
     begin v_birth := (v_row ->> 'birth_date')::date; exception when others then v_birth := null; end;
@@ -96,7 +100,7 @@ begin
     elsif v_birth is null then v_err := '생년월일';
     elsif v_gender is not null and v_gender not in ('남','여') then v_err := '성별(남/여)';
     elsif char_length(v_occ) not between 1 and 120 then v_err := '직업';
-    elsif char_length(v_addr) not between 5 and 500 then v_err := '주소';
+    elsif char_length(v_addr) not between 2 and 500 then v_err := '주소';
     elsif v_mobile is not null and (v_digits !~ '^01[016789][0-9]{7,8}$' or char_length(v_mobile) > 32) then v_err := '휴대폰';
     elsif v_home is not null and (char_length(v_home) > 32 or v_home !~ '^[0-9+()[:space:]-]{6,32}$') then v_err := '자택전화';
     elsif v_agreed is null or v_agreed > v_today then v_err := '작성일';
@@ -132,8 +136,8 @@ begin
 
     if p_commit then
       insert into public.founding_members(name,address,birth_date,gender,occupation,phone_home,phone_mobile,
-        signature_data,agreed_at,privacy_agreed,public_consent,source,paper_ref,registered_by)
-      values(v_name,v_addr,v_birth,v_gender,v_occ,v_home,v_mobile,null,v_agreed,true,false,'paper',v_ref,auth.uid())
+        signature_data,agreed_at,privacy_agreed,public_consent,source,paper_ref,registered_by,paper_note)
+      values(v_name,v_addr,v_birth,v_gender,v_occ,v_home,v_mobile,null,v_agreed,true,false,'paper',v_ref,auth.uid(),v_note)
       returning id into v_id;
       v_out := v_out || jsonb_build_object('row',v_i,'name',v_name,'status','registered','id',v_id);
     else

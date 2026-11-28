@@ -55,7 +55,7 @@ import Layout from "../layouts/Layout.astro";
 					<summary class="cursor-pointer text-[15px] font-semibold text-stone-800 dark:text-stone-300 tracking-[-0.14px]">종이 동의서 등록</summary>
 					<p class="mt-3 text-[13px] text-stone-500 dark:text-stone-400 tracking-[-0.14px] leading-relaxed">
 						구글 드라이브 검토표에서 머리줄을 포함해 표를 복사해 붙여넣으세요. 열 순서: 이름, 생년월일, 성별, 직업, 주소, 휴대폰, 자택전화, 작성일, 서명, 사진ID, 확인필요.
-						확인필요 칸이 비어 있는 줄만 등록됩니다. 온라인·종이 기존 발기인과 이름+생년월일 또는 휴대폰이 같으면 등록하지 않습니다.
+						확인필요 칸의 내용은 그대로 메모로 남아 목록에 보입니다. 온라인·종이 기존 발기인과 이름+생년월일 또는 휴대폰이 같으면 등록하지 않습니다.
 					</p>
 					<textarea id="paper-input" rows="6" class="mt-3 w-full p-3 text-[13px] font-mono text-stone-900 dark:text-stone-100 bg-white dark:bg-[#0e0e0d] border border-stone-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-stone-300 dark:focus:ring-stone-600"></textarea>
 					<div class="mt-3 flex gap-2">
@@ -187,6 +187,7 @@ import Layout from "../layouts/Layout.astro";
 						field('자택', m.phone_home || '-'),
 						field('추천인', m.referrer || '-'),
 					);
+					if (m.source === 'paper' && m.paper_note) grid.append(field('확인필요', m.paper_note));
 					info.append(head, grid);
 
 					if (m.source === 'paper') {
@@ -247,8 +248,8 @@ import Layout from "../layouts/Layout.astro";
 						address: c[4] || '', phone_mobile: c[5] || '', phone_home: c[6] || '', agreed_at: normDate(c[7]),
 						signature: /^(있음|o|y|yes|true|1|✓|✔)$/i.test(c[8] || ''), paper_ref: c[9] || '',
 					};
-					if ((c[10] || '') !== '') blocked.push({ name: r.name, reason: '확인필요: ' + c[10] });
-					else rows.push(r);
+					r.note = c[10] || '';
+					rows.push(r);
 				});
 				return { rows, blocked };
 			}
