@@ -92,7 +92,7 @@ begin
     'phone_home',v_home,'phone_mobile',v_mobile,'signature_data',v_signature,'agreed_at',v_today,
     'privacy_agreed',true,'public_consent',coalesce((p_founder ->> 'public_consent')::boolean,false),
     'founder_agreed',true,'eligibility_confirmed',true,'sensitive_agreed',true,
-    'contact_consent',coalesce((p_founder ->> 'contact_consent')::boolean,false),'consent_version','2026-11-27');
+    'contact_consent',coalesce((p_founder ->> 'contact_consent')::boolean,false),'consent_version','2026-11-28');
 end $$;
 revoke all on function private.community_validate_founder(jsonb) from public,anon,authenticated;
 
