@@ -51,6 +51,20 @@ import Layout from "../layouts/Layout.astro";
 					</button>
 				</div>
 
+				<details id="paper-import" class="mb-8 bg-stone-100 dark:bg-white/[0.03] rounded-2xl p-6">
+					<summary class="cursor-pointer text-[15px] font-semibold text-stone-800 dark:text-stone-300 tracking-[-0.14px]">종이 동의서 등록</summary>
+					<p class="mt-3 text-[13px] text-stone-500 dark:text-stone-400 tracking-[-0.14px] leading-relaxed">
+						구글 드라이브 검토표에서 머리줄을 포함해 표를 복사해 붙여넣으세요. 열 순서: 이름, 생년월일, 성별, 직업, 주소, 휴대폰, 자택전화, 작성일, 서명, 사진ID, 확인필요.
+						확인필요 칸이 비어 있는 줄만 등록됩니다. 온라인·종이 기존 발기인과 이름+생년월일 또는 휴대폰이 같으면 등록하지 않습니다.
+					</p>
+					<textarea id="paper-input" rows="6" class="mt-3 w-full p-3 text-[13px] font-mono text-stone-900 dark:text-stone-100 bg-white dark:bg-[#0e0e0d] border border-stone-200 dark:border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-stone-300 dark:focus:ring-stone-600"></textarea>
+					<div class="mt-3 flex gap-2">
+						<button id="paper-check" class="h-9 px-5 text-[13px] font-medium border border-stone-300 dark:border-white/20 rounded-full text-stone-700 dark:text-stone-300">검사</button>
+						<button id="paper-commit" disabled class="h-9 px-5 text-[13px] font-medium text-white dark:text-stone-900 bg-[#222222] dark:bg-white rounded-full disabled:opacity-40">등록</button>
+					</div>
+					<div id="paper-result" class="mt-4 text-[13px] tracking-[-0.14px]"></div>
+				</details>
+
 				<div id="loading" class="text-[15px] text-stone-400 dark:text-stone-500 tracking-[-0.14px]">불러오는 중...</div>
 				<div id="members-list" class="space-y-4"></div>
 			</div>
@@ -161,6 +175,9 @@ import Layout from "../layouts/Layout.astro";
 							? 'text-[11px] font-medium text-stone-700 dark:text-stone-300 bg-stone-200 dark:bg-white/10 rounded-full px-2 py-0.5'
 							: 'text-[11px] font-medium text-stone-400 dark:text-stone-500 border border-stone-300 dark:border-white/10 rounded-full px-2 py-0.5',
 							m.public_consent ? '공개 동의' : '비공개'),
+						m.source === 'paper'
+							? el('span', 'text-[11px] font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-500/10 rounded-full px-2 py-0.5', '종이')
+							: el('span', 'text-[11px] text-stone-400 dark:text-stone-500', '온라인'),
 					);
 					const grid = el('div', 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[13px] tracking-[-0.14px]');
 					grid.append(
@@ -171,6 +188,17 @@ import Layout from "../layouts/Layout.astro";
 						field('추천인', m.referrer || '-'),
 					);
 					info.append(head, grid);
+
+					if (m.source === 'paper') {
+						const link = el('a', 'shrink-0 text-[13px] text-stone-600 dark:text-stone-300 underline underline-offset-4', '원본 사진 ↗');
+						if (/^[A-Za-z0-9_-]{10,200}$/.test(m.paper_ref || '')) link.href = 'https://drive.google.com/file/d/' + m.paper_ref + '/view';
+						link.target = '_blank';
+						link.rel = 'noopener noreferrer';
+						row.append(info, link);
+						card.appendChild(row);
+						frag.appendChild(card);
+						return;
+					}
 
 					const btn = el('button', 'sig-btn shrink-0 border border-stone-200 dark:border-white/10 rounded-xl overflow-hidden hover:border-stone-400 dark:hover:border-white/30 transition-colors');
 					const img = el('img', 'w-[120px] h-[60px] object-contain bg-white');
@@ -190,6 +218,80 @@ import Layout from "../layouts/Layout.astro";
 				});
 				membersList.appendChild(frag);
 			}
+
+			// 종이 동의서 등록
+			const paperInput = document.getElementById('paper-input');
+			const paperResult = document.getElementById('paper-result');
+			const paperCommit = document.getElementById('paper-commit');
+			let paperRows = null;
+
+			function parsePaper(text) {
+				const lines = text.split(/\r?\n/).filter((l) => l.trim() !== '');
+				const rows = [];
+				const blocked = [];
+				lines.forEach((line) => {
+					const c = (line.includes('\t') ? line.split('\t') : line.split(',')).map((v) => v.trim());
+					if (c[0] === '이름') return;
+					const r = {
+						name: c[0] || '', birth_date: c[1] || '', gender: c[2] || '', occupation: c[3] || '',
+						address: c[4] || '', phone_mobile: c[5] || '', phone_home: c[6] || '', agreed_at: c[7] || '',
+						signature: /^(있음|o|y|yes|true|1|✓|✔)$/i.test(c[8] || ''), paper_ref: c[9] || '',
+					};
+					if ((c[10] || '') !== '') blocked.push({ name: r.name, reason: '확인필요: ' + c[10] });
+					else rows.push(r);
+				});
+				return { rows, blocked };
+			}
+
+			const STATUS = { ok: '등록 가능', registered: '등록됨', duplicate: '중복', invalid: '확인 필요' };
+			function renderPaper(results, blocked) {
+				paperResult.textContent = '';
+				const list = el('ul', 'space-y-1');
+				results.forEach((r) => {
+					const good = r.status === 'ok' || r.status === 'registered';
+					const li = el('li', good ? 'text-stone-700 dark:text-stone-300' : 'text-red-600 dark:text-red-400',
+						`${r.name || '(이름 없음)'} · ${STATUS[r.status] || r.status}${r.reason ? ' · ' + r.reason : ''}`);
+					list.appendChild(li);
+				});
+				blocked.forEach((b) => list.appendChild(el('li', 'text-red-600 dark:text-red-400', `${b.name || '(이름 없음)'} · 건너뜀 · ${b.reason}`)));
+				paperResult.appendChild(list);
+			}
+
+			async function runPaper(commit) {
+				const { rows, blocked } = parsePaper(paperInput.value);
+				if (rows.length === 0) {
+					paperResult.textContent = blocked.length ? '' : '붙여넣은 줄이 없습니다.';
+					if (blocked.length) renderPaper([], blocked);
+					paperCommit.disabled = true;
+					return null;
+				}
+				const { data, error } = await supabase.rpc('admin_import_paper_founders', { p_rows: commit ? paperRows : rows, p_commit: commit });
+				if (error) {
+					paperResult.textContent = '실패: ' + error.message;
+					paperCommit.disabled = true;
+					return null;
+				}
+				renderPaper(data, blocked);
+				return { data, rows };
+			}
+
+			document.getElementById('paper-check').addEventListener('click', async () => {
+				paperCommit.disabled = true;
+				const res = await runPaper(false);
+				if (!res) return;
+				paperRows = res.rows.filter((_, i) => res.data[i] && res.data[i].status === 'ok');
+				paperCommit.disabled = paperRows.length === 0;
+				paperCommit.textContent = paperRows.length ? `${paperRows.length}명 등록` : '등록';
+			});
+			paperInput.addEventListener('input', () => { paperCommit.disabled = true; paperCommit.textContent = '등록'; });
+			paperCommit.addEventListener('click', async () => {
+				if (!paperRows || paperRows.length === 0) return;
+				paperCommit.disabled = true;
+				const res = await runPaper(true);
+				paperRows = null;
+				paperCommit.textContent = '등록';
+				if (res) showData();
+			});
 
 			// Modal close
 			const modal = document.getElementById('signature-modal');
